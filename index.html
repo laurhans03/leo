@@ -1,0 +1,136 @@
+<!doctype html>
+<html lang="de">
+<head>
+  <meta charset="utf-8" />
+  <title>VR Test – A-Frame</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <script src="https://aframe.io/releases/1.5.0/aframe.min.js"></script>
+  <style>
+    /* Kleines zentrales Hinweisfeld für Desktop (nur Anzeige), im VR sehen wir A-Frame-Text */
+    body { margin:0; font-family: Arial, sans-serif; background:#111; color:#fff; }
+    .hint { position:fixed; left:10px; bottom:10px; z-index:9999; background:rgba(0,0,0,0.6); padding:8px 10px; border-radius:6px; }
+  </style>
+</head>
+<body>
+  <div class="hint">Teste: Blick auf den großen gelben Kreis (1.2s) → Raum wechseln. Auf Quest: Enter VR drücken.</div>
+
+  <a-scene background="color: #000">
+    <a-assets>
+      <!-- 360 Bild (öffentlicher CDN) – du kannst später hier eigene 360-Bilder einsetzen -->
+      <img id="skyImg" src="https://cdn.aframe.io/360-image-gallery-boilerplate/img/sechelt.jpg" crossorigin="anonymous" />
+    </a-assets>
+
+    <!-- Sky (360° Umgebung) -->
+    <a-sky id="sky" src="#skyImg" rotation="0 -90 0"></a-sky>
+
+    <!-- Kamera mit Gaze-Cursor (fuse = Blickauslösen) -->
+    <a-entity id="cameraRig">
+      <a-entity id="camera" camera look-controls position="0 1.6 0">
+        <!-- Cursor: fuse true, fuseTimeout = 1200 ms (1.2s) -->
+        <a-entity id="cursor"
+                  cursor="fuse: true; fuseTimeout: 1200"
+                  geometry="primitive: ring; radiusInner: 0.01; radiusOuter: 0.02"
+                  material="color: white; shader: flat"
+                  position="0 0 -0.5"
+                  animation__idle="property: scale; dir: alternate; dur: 1200; to: 1.1 1.1 1.1; loop: true">
+        </a-entity>
+
+        <!-- Simulierte Hände (einfach, als Platzhalter/sichtbarer Schoß) -->
+        <a-box id="leftHand" position="-0.35 -0.45 -0.6" depth="0.02" height="0.08" width="0.06" color="#d6bba6" rotation="0 0 10"></a-box>
+        <a-box id="rightHand" position="0.35 -0.45 -0.6" depth="0.02" height="0.08" width="0.06" color="#d6bba6" rotation="0 0 -10"></a-box>
+      </a-entity>
+    </a-entity>
+
+    <!-- Großer, gut sichtbarer Hotspot (in Augenhöhe) -->
+    <a-entity id="hotspot"
+              geometry="primitive: torus; radius: 0.28; radiusTubular: 0.06"
+              material="color: #FFD24A; opacity: 0.95; shader: flat"
+              position="0 1.45 -2"
+              class="interactable"
+              event-set__enter="_event: mouseenter; material.color: #FF8C00"
+              event-set__leave="_event: mouseleave; material.color: #FFD24A">
+      <!-- einfacher Text über dem Hotspot -->
+      <a-text value="Zum nächsten Raum schauen" align="center" position="0 0.5 0" color="#fff" width="3"></a-text>
+    </a-entity>
+
+    <!-- Ladeanzeige / Feedback als Text im Raum (wird sichtbar, wenn geladen wird) -->
+    <a-entity id="loadingText" position="0 1.9 -1" visible="false">
+      <a-plane color="#000" opacity="0.6" width="1.8" height="0.4" position="0 0 0"></a-plane>
+      <a-text id="loadingLabel" value="Loading..." align="center" color="#fff" width="1.6" position="0 0 0.01"></a-text>
+    </a-entity>
+
+    <!-- Beschriftung aktueller Raum -->
+    <a-text id="roomLabel" value="Raum 1" align="center" position="0 2.2 -1" color="#cef" width="2.2"></a-text>
+
+    <!-- Boden (nur damit man Orientierung hat) -->
+    <a-plane rotation="-90 0 0" width="30" height="30" color="#222" position="0 0 0"></a-plane>
+
+  </a-scene>
+
+  <script>
+    // JS-Logik: Wechsel zwischen 2 "Räumen" (hier: nur Rotation/Label wechseln, später Bilder/Videos austauschen)
+    (function(){
+      const hotspot = document.querySelector('#hotspot');
+      const sky = document.querySelector('#sky');
+      const loading = document.querySelector('#loadingText');
+      const loadingLabel = document.querySelector('#loadingLabel');
+      const roomLabel = document.querySelector('#roomLabel');
+
+      let room = 1; // aktuell Raum 1
+      let busy = false;
+
+      // Hilfsfunktion: Zeige Ladeanzeige
+      function showLoading(text) {
+        loadingLabel.setAttribute('value', text || 'Loading...');
+        loading.setAttribute('visible', true);
+      }
+      function hideLoading() {
+        loading.setAttribute('visible', false);
+      }
+
+      // Wenn der Cursor das Hotspot-Objekt "klickt" (Fuse -> click event)
+      hotspot.addEventListener('click', function (evt) {
+        if (busy) return;
+        busy = true;
+
+        // akustische / visuelle Rückmeldung (hier: Text anzeigen)
+        showLoading('Lädt nächsten Raum...');
+        // kleine Animation / Feedback: verkleinere Cursor kurz (optional)
+        document.querySelector('#cursor').setAttribute('material', 'color', '#0f0');
+
+        // Simulierter Ladeprozess (hier 1200ms, in real case: lade großes 360 video)
+        setTimeout(() => {
+          // Wechseln: wir ändern Sky-Rotation und den Raum-Label
+          if (room === 1) {
+            sky.setAttribute('rotation', '0 -200 0'); // anderer Blickwinkel
+            roomLabel.setAttribute('value', 'Raum 2');
+            // HIER könntest du sky.setAttribute('src', '#skyImg2') verwenden, wenn du mehrere Bilder hast
+            room = 2;
+          } else {
+            sky.setAttribute('rotation', '0 -90 0');
+            roomLabel.setAttribute('value', 'Raum 1');
+            room = 1;
+          }
+
+          // Ladeanzeige ausblenden & fertig
+          hideLoading();
+          document.querySelector('#cursor').setAttribute('material', 'color', '#fff');
+          busy = false;
+        }, 1200);
+      });
+
+      // Optional: Mouseenter/leave Feedback (für Desktop-Testing)
+      hotspot.addEventListener('mouseenter', () => {
+        hotspot.setAttribute('scale', '1.12 1.12 1.12');
+      });
+      hotspot.addEventListener('mouseleave', () => {
+        hotspot.setAttribute('scale', '1 1 1');
+      });
+
+      // Fallback: falls ein Gerät kein Fuse unterstützt, erlauben Klick via Touch/Pointer (Desktop)
+      hotspot.addEventListener('mousedown', () => hotspot.emit('click'));
+
+    })();
+  </script>
+</body>
+</html>
